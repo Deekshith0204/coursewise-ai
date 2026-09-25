@@ -42,6 +42,7 @@ allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in allowed_origins if origin.strip()],
+    allow_origin_regex=r"https://.*\.app\.github\.dev|http://localhost:\d+|http://127\.0\.0\.1:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
