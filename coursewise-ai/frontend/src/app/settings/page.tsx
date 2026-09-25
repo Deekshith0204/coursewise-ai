@@ -36,11 +36,16 @@ export default function SettingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [h, c] = await Promise.all([api.getHealth(), api.getConfig()]);
+      const h = await api.getHealth();
       setHealth(h);
-      setConfig(c);
+      try {
+        const c = await api.getConfig();
+        setConfig(c);
+      } catch (cErr) {
+        console.warn('Could not load detailed config:', cErr);
+      }
     } catch (err: any) {
-      setError('Unable to connect to the CourseWise AI backend API. Please ensure the backend is running on port 8000.');
+      setError(`Unable to connect to the CourseWise AI backend API. Please make sure the backend is running on port 8000.`);
     } finally {
       setLoading(false);
     }
@@ -54,16 +59,25 @@ export default function SettingsPage() {
     setTesting(true);
     setTestResult(null);
     try {
-      const [h, c] = await Promise.all([api.getHealth(), api.getConfig()]);
+      const h = await api.getHealth();
       setHealth(h);
-      setConfig(c);
-      if (h.ai_configured) {
-        setTestResult(`Success: Backend is healthy and AI provider (${c.model}) is active and ready!`);
-      } else {
-        setTestResult('Notice: Backend is healthy, but AI_API_KEY is not yet set.');
+      try {
+        const c = await api.getConfig();
+        setConfig(c);
+        if (h.ai_configured) {
+          setTestResult(`Success: Backend is healthy and AI provider (${c.model}) is active and ready!`);
+        } else {
+          setTestResult('Notice: Backend is connected and healthy! AI_API_KEY is not yet configured.');
+        }
+      } catch {
+        if (h.ai_configured) {
+          setTestResult(`Success: Backend is healthy and AI provider (${h.ai_model}) is active!`);
+        } else {
+          setTestResult('Notice: Backend is connected and healthy! AI_API_KEY is not yet configured.');
+        }
       }
     } catch (err: any) {
-      setTestResult(`Error: Could not reach backend: ${err.message}`);
+      setTestResult(`Error: Could not reach backend (${err.message}). Check if the backend is running in Terminal 1 on port 8000.`);
     } finally {
       setTesting(false);
     }
@@ -171,33 +185,35 @@ export default function SettingsPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-blue-100 text-blue-700 mt-0.5">
+            <div className={`p-2 rounded-lg mt-0.5 ${health ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
               <Server className="w-4 h-4" />
             </div>
             <div>
               <span className="text-xs text-slate-500">FastAPI Backend Status</span>
               <p className="font-bold text-slate-900 text-sm mt-0.5 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-                Online &amp; Healthy (v{health?.version || '1.0.0'})
+                <span className={`w-2 h-2 rounded-full inline-block ${health ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                {health ? `Online & Healthy (v${health.version})` : 'Offline / Unreachable'}
               </p>
               <span className="text-[11px] text-slate-400 mt-1 block">
-                Database: SQLite (data/coursewise.db)
+                {health ? 'Database: SQLite (data/coursewise.db)' : 'Check terminal: python3 -m uvicorn app.main:app'}
               </span>
             </div>
           </div>
 
           <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-start gap-3">
             <div className={`p-2 rounded-lg mt-0.5 ${
-              config?.configured ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+              !health ? 'bg-slate-100 text-slate-400' : config?.configured ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
             }`}>
               <Key className="w-4 h-4" />
             </div>
             <div>
               <span className="text-xs text-slate-500">AI Provider Key</span>
               <p className={`font-bold text-sm mt-0.5 flex items-center gap-1.5 ${
-                config?.configured ? 'text-emerald-700' : 'text-amber-700'
+                !health ? 'text-slate-500' : config?.configured ? 'text-emerald-700' : 'text-amber-700'
               }`}>
-                {config?.configured ? (
+                {!health ? (
+                  'Unknown (Backend Offline)'
+                ) : config?.configured ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     Configured ({config.masked_key})
@@ -210,7 +226,7 @@ export default function SettingsPage() {
                 )}
               </p>
               <span className="text-[11px] text-slate-400 mt-1 block">
-                Model: {config?.model || 'gemini-1.5-flash'}
+                Model: {config?.model || (health ? health.ai_model : 'gemini-3-flash-preview')}
               </span>
             </div>
           </div>

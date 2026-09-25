@@ -27,14 +27,21 @@ class ApiService {
     if (!response.ok) {
       let errorMessage = `API request failed (${response.status})`;
       try {
-        const errorData = await response.json();
-        if (errorData && errorData.detail) {
-          errorMessage = typeof errorData.detail === 'string' 
-            ? errorData.detail 
-            : JSON.stringify(errorData.detail);
+        const rawText = await response.text();
+        try {
+          const errorData = JSON.parse(rawText);
+          if (errorData && errorData.detail) {
+            errorMessage = typeof errorData.detail === 'string' 
+              ? errorData.detail 
+              : JSON.stringify(errorData.detail);
+          } else if (rawText) {
+            errorMessage = rawText;
+          }
+        } catch {
+          if (rawText) errorMessage = rawText;
         }
       } catch {
-        errorMessage = (await response.text()) || errorMessage;
+        // Stream read failed
       }
       throw new Error(errorMessage);
     }
