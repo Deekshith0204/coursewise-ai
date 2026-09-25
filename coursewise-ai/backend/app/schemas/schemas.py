@@ -170,3 +170,10 @@ class SummaryHistoryItem(BaseModel):
 class EvaluationRateRequest(BaseModel):
     rating: int = Field(ge=1, le=5)
     feedback_notes: Optional[str] = None
+
+
+class ConfigUpdateRequest(BaseModel):
+    api_key: str
+    model: Optional[str] = "gemini-1.5-flash"
+    base_url: Optional[str] = None
+    provider: Optional[str] = "openai"

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from ...schemas.schemas import HealthResponse
+from ...schemas.schemas import HealthResponse, ConfigUpdateRequest
 from ...services.ai_service import ai_service
 
 router = APIRouter(prefix="/health", tags=["Health"])
@@ -21,3 +21,13 @@ def get_health():
 @router.get("/config")
 def get_config():
     return ai_service.get_config_info()
+
+
+@router.post("/config")
+def update_config(req: ConfigUpdateRequest):
+    return ai_service.update_config(
+        api_key=req.api_key,
+        model=req.model,
+        base_url=req.base_url,
+        provider=req.provider
+    )

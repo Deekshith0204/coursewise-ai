@@ -50,6 +50,14 @@ class ApiService {
     return this.request<AIConfigInfo>('/health/config');
   }
 
+  async updateConfig(payload: { api_key: string; model?: string; base_url?: string; provider?: string }): Promise<AIConfigInfo> {
+    return this.request<AIConfigInfo>('/health/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
+
   async listDocuments(): Promise<DocumentInfo[]> {
     return this.request<DocumentInfo[]>('/documents');
   }

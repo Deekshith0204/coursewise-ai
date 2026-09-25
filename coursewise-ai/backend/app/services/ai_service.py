@@ -21,8 +21,8 @@ class AIServiceError(Exception):
 class AIService:
     def __init__(self):
         self.api_key = os.getenv("AI_API_KEY", "").strip()
-        self.model = os.getenv("AI_MODEL", "gemini-1.5-flash").strip()
-        default_base_url = "https://generativelanguage.googleapis.com/v1beta/openai" if self.api_key.startswith("AIza") else "https://api.openai.com/v1"
+        self.model = os.getenv("AI_MODEL", "gemini-3-flash-preview").strip()
+        default_base_url = "https://generativelanguage.googleapis.com/v1beta/openai" if (self.api_key.startswith("AIza") or self.api_key.startswith("AQ.")) else "https://api.openai.com/v1"
         self.base_url = os.getenv("AI_BASE_URL", default_base_url).strip().rstrip("/")
         self.provider = os.getenv("AI_PROVIDER", "openai").strip().lower()
 
@@ -44,6 +44,38 @@ class AIService:
             "base_url": self.base_url,
             "masked_key": masked_key
         }
+
+    def update_config(self, api_key: str, model: Optional[str] = None, base_url: Optional[str] = None, provider: Optional[str] = None) -> Dict[str, Any]:
+        self.api_key = api_key.strip()
+        if model:
+            self.model = model.strip()
+        if provider:
+            self.provider = provider.strip().lower()
+        if base_url:
+            self.base_url = base_url.strip().rstrip("/")
+        elif self.api_key.startswith("AIza"):
+            self.base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+        else:
+            self.base_url = "https://api.openai.com/v1"
+
+        os.environ["AI_API_KEY"] = self.api_key
+        os.environ["AI_MODEL"] = self.model
+        os.environ["AI_BASE_URL"] = self.base_url
+        os.environ["AI_PROVIDER"] = self.provider
+
+        env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+        try:
+            with open(env_path, "w", encoding="utf-8") as f:
+                f.write(f"AI_API_KEY={self.api_key}\n")
+                f.write(f"AI_MODEL={self.model}\n")
+                f.write(f"AI_BASE_URL={self.base_url}\n")
+                f.write(f"AI_PROVIDER={self.provider}\n")
+                f.write(f"DATABASE_URL=sqlite:///../data/coursewise.db\n")
+                f.write(f"ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000\n")
+        except Exception as e:
+            logger.warning(f"Could not write .env file: {e}")
+
+        return self.get_config_info()
 
     async def generate_personalized_summary(
         self,
@@ -249,42 +281,60 @@ You MUST output a valid, parseable JSON object with the following exact keys:
 }}"""
 
     async def _call_llm(self, system_prompt: str, user_prompt: str) -> str:
-        """Call the configured LLM API using standard OpenAI-compatible completions."""
+        """Call the configured LLM API using standard OpenAI-compatible completions with automatic model fallback."""
         url = f"{self.base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
 
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            "temperature": 0.2,
-            "response_format": {"type": "json_object"}
-        }
+        # Build prioritized list of model candidates to handle deprecated models and temporary demand spikes
+        models_to_try = [self.model]
+        if "generativelanguage.googleapis.com" in self.base_url:
+            fallback_models = ["gemini-3-flash-preview", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.8-flash"]
+            for m in fallback_models:
+                if m not in models_to_try:
+                    models_to_try.append(m)
 
-        try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(url, headers=headers, json=payload)
-                if response.status_code != 200:
+        last_error = "Unknown error"
+
+        for current_model in models_to_try:
+            payload = {
+                "model": current_model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": 0.2,
+                "response_format": {"type": "json_object"}
+            }
+
+            try:
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    response = await client.post(url, headers=headers, json=payload)
                     if response.status_code == 400 and "response_format" in response.text:
                         payload.pop("response_format", None)
                         response = await client.post(url, headers=headers, json=payload)
 
-                if response.status_code != 200:
-                    error_detail = response.text[:300]
-                    logger.error(f"AI API returned status {response.status_code}: {error_detail}")
-                    raise AIServiceError(f"AI API request failed ({response.status_code}): {error_detail}")
+                    if response.status_code == 200:
+                        data = response.json()
+                        content = data["choices"][0]["message"]["content"]
+                        self.model = current_model
+                        return content
+                    elif response.status_code in (404, 503):
+                        logger.warning(f"Model '{current_model}' returned {response.status_code}. Falling back to next available model...")
+                        last_error = response.text[:300]
+                        continue
+                    else:
+                        error_detail = response.text[:300]
+                        logger.error(f"AI API returned status {response.status_code}: {error_detail}")
+                        raise AIServiceError(f"AI API request failed ({response.status_code}): {error_detail}")
+            except httpx.RequestError as e:
+                logger.error(f"Network error communicating with AI API for model '{current_model}': {e}")
+                last_error = str(e)
+                continue
 
-                data = response.json()
-                content = data["choices"][0]["message"]["content"]
-                return content
-        except httpx.RequestError as e:
-            logger.error(f"Network error communicating with AI API: {e}")
-            raise AIServiceError(f"Failed to communicate with AI provider: {str(e)}")
+        raise AIServiceError(f"All model candidates failed. Last response: {last_error}")
 
     def _parse_and_validate_json(self, raw_text: str) -> Dict[str, Any]:
         """Extract and validate the structured JSON summary response."""

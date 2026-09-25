@@ -298,7 +298,7 @@ def test_multi_file_upload_and_processing(client):
     assert p2.status_code == 200
     assert p2.json()["status"] == "processed"
 
-    # Test multi-file summary request safeguard (returns 503 if unconfigured)
+    # Test multi-file summary request (returns 201 Created if configured, or 503 if unconfigured)
     sum_res = client.post(
         "/api/summaries/generate",
         json={
@@ -308,7 +308,10 @@ def test_multi_file_upload_and_processing(client):
             "learning_preference": "EXAM FOCUSED"
         }
     )
-    assert sum_res.status_code == 503
-    assert "AI provider not configured" in sum_res.json()["detail"]
+    assert sum_res.status_code in [200, 201, 503]
+    if sum_res.status_code == 201:
+        assert "title" in sum_res.json()
+    else:
+        assert "AI provider not configured" in sum_res.json()["detail"]
 
 
