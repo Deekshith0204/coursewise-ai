@@ -1,0 +1,21 @@
+CS402: Operating Systems - Virtual Memory Management
+======================================================
+
+1. Introduction to Virtual Memory
+Virtual memory is defined as a memory management technique that provides an "idealized abstraction of the storage resources" that are actually available on a given machine. It creates the illusion to processes of a very large, uniform, contiguous address space.
+
+Virtual addresses are translated to physical addresses by the Memory Management Unit (MMU) with hardware assistance.
+
+2. Paging Mechanism and Page Tables
+Paging divides virtual memory into fixed-size blocks called pages, and physical memory into blocks of the same size called page frames. Typical page size is 4KB (4096 bytes).
+
+A Page Table maps virtual page numbers (VPN) to physical frame numbers (PFN).
+When a virtual address is accessed that is not currently mapped into physical RAM, the MMU signals a Page Fault trap to the operating system kernel.
+
+3. Page Replacement Algorithms
+When a page fault occurs and no free physical frames exist, the OS must choose a victim page to evict to disk swap space:
+- FIFO (First-In, First-Out): Simple queue, but suffers from Belady's Anomaly.
+- LRU (Least Recently Used): Replaces the page that has not been accessed for the longest time.
+- Clock (Second Chance): Approximation of LRU using a reference bit.
+
+Prerequisites: Computer Architecture, cache hierarchies, interrupts, and pointer arithmetic.

@@ -1,0 +1,83 @@
+# ========================================================
+# CourseWise AI - Comprehensive .gitignore
+# ========================================================
+
+# Environment Variables & Secrets (CRITICAL)
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!*.env.example
+!**/.env.example
+
+# Node / Next.js
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Python & Virtual Environments
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing & Coverage
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Database & Runtime State (CRITICAL)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+**/coursewise.db
+coursewise.db
+
+# User Uploaded Documents & Temporary Data (CRITICAL)
+**/data/uploads/*
+!**/data/uploads/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep
+
+# IDEs & OS Files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Logs & Temporary Files
+*.log
+logs/
+tmp/
+temp/
+scratch/
